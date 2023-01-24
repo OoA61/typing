@@ -524,8 +524,8 @@ const { request } = require('express');
 const { waitForDebugger } = require('inspector');
 app.use('/users', userRouter)
 
-
-app.listen(5010, () => {
+const port = process.env.port || 3000;
+app.listen(port, () => {
     console.log('server is running on localhost:5005');
 })
 
