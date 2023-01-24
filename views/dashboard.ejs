@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <script src="https://code.jquery.com/jquery-3.5.0.js"></script>
+    <script tyle="text/javascript">  
+    var startingX, newX; 
+    var words = '<%-JSON.stringify(characters)%>'
+    var wordCounter = 0;
+    var letterCounter = 0;
+    var backspaceCounter= 0;
+    var wrong = 0;
+    var right = 0;
+    var wordLength;
+    var lastWordCorrect;
+    var lastWordLength; 
+    var alphabet = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M','.',',','?','!'];
+    
+    function dailyTrial(){
+        fetch('/dailyTrial', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        })
+    }
+    
+
+    function startTimer(){
+        let time = 20
+        const timer = document.getElementById('countdown');
+        const myInterval = setInterval(updateCountdown, 1000);
+        function updateCountdown(){
+            if (time > 0){
+                time = time - 1;
+                timer.innerHTML = `${time}`;
+            }
+            if (time == 0){
+                wrapper.style.filter = 'blur(10px)'
+                wrapper.style.transition = 'filter .1s'
+                clearInterval(myInterval);
+                endTest();
+            }
+        }
+    }
+
+    function startTest(){
+        //initialize
+        const caret = document.getElementById("caret")
+        caret.style.display = 'block'
+        var caretX = caret.getBoundingClientRect();
+        startingX = caretX.left;
+        newX = caretX.left + 18;
+        const wordsList = document.getElementById("words").children;
+        wordsList[0].classList.add("active");
+        const currentWord = document.getElementsByClassName("word active")[0].children;
+        currentLetter = currentWord[letterCounter];
+        //
+        const words = document.getElementById('words')
+        const button = document.getElementById('startBtn')
+        console.log(button)
+        words.style.filter = 'blur(0px)'
+        words.style.transition = 'filter .2s'
+        button.remove()
+    }
+
+    function endTest(){
+        //remove wrapper and word paragraph
+        const wrapper = document.getElementById('wrapper')
+        const countdown = document.getElementById('countdown')
+        countdown.style.display = 'none'
+        countdown.style.transition = 'display .5s'
+        wrapper.style.display = 'none'
+        wrapper.style.transition = 'display .5s'
+        //
+        const wpm = document.getElementById('wpm')
+        const summary = document.getElementById('summary')
+        summary.style.display = 'block'
+        wpm.innerHTML = `WPM: ${right}`;
+        wpm.style.display = 'block'
+        updateWPM(right);
+    }
+
+    function updateWPM(right) {
+        fetch('/updateWPM', {
+            method: 'POST',
+            body: JSON.stringify({ right }),
+            headers: { 'Content-Type': 'application/json' }
+        })
+    }
+
+    addEventListener('keydown', (event) => {
+        //getting which key is pressed
+        let keycode = event.key;
+        //prevents spacebar scrolling
+        if(keycode == ' '  && event.target == document.body){
+            event.preventDefault();
+        };
+        //initializes caret
+        const caret = document.getElementById("caret")
+        //creates a variable refers to the div with "active" as it's children <letter>
+        let currentWord = document.getElementsByClassName("word active")[0].children;
+        
+        //creates a variable that contains how many letters are in the active word
+        
+        //console.log(currentWord[0].classList)
+        //var arr = [...currentWord];
+        //console.log(arr)
+
+        //at start, letter counter is at 0 -> moves the caret by 1 letter. h e l l o (length = 5) [0,1,2,3,4]
+        if (alphabet.indexOf(keycode) > -1){
+            currentWordLength = currentWord.length;
+            if (letterCounter == 0) {
+                wordLength = currentWordLength
+            }
+            if (letterCounter < wordLength - 1){
+                currentLetter = currentWord[letterCounter];
+                if (checkLetter(currentLetter.innerHTML, keycode) == 0){
+                    currentLetter.classList.add('correct');
+                }
+                else if (checkLetter(currentLetter.innerHTML, keycode) == 1){
+                    currentLetter.classList.add('incorrect')
+                }
+                letterCounter += 1;
+            } 
+            else if (letterCounter == wordLength - 1){
+                currentLetter = currentWord[letterCounter];
+                if (checkLetter(currentLetter.innerHTML, keycode) == 0){
+                    currentLetter.classList.add('correct');
+                }
+                else if (checkLetter(currentLetter.innerHTML, keycode) == 1){
+                    currentLetter.classList.add('incorrect')
+                }
+                letterCounter += 1;
+            } 
+            //adds a <letter> element if the user types a letters more than the length of the word
+            else if(letterCounter > wordLength - 1 && letterCounter < wordLength + 8){
+                addErrorLetter(keycode);
+                currentLetter = currentWord[letterCounter];
+                letterCounter +=1;
+            }
+            letterCaret(currentWord, currentLetter);
+            backspaceCounter = 0;
+        }
+
+        else if (keycode == ' '){
+            currentWordLength = currentWord.length;
+            const wordsList = document.getElementById("words").children;
+            wordsList[wordCounter].classList.remove("active")
+            wordsList[wordCounter + 1].classList.add("active")
+            wordCounter += 1;
+            letterCounter = 0;
+            //move caret to the location of the current active word
+            spaceBarCaret();
+            //checks if word is correct or incorrect
+            wordChecker(currentWord, currentWordLength, wordsList, wordCounter);
+        } 
+
+        //NEED TO FIX 
+        else if (keycode == 'Backspace') {
+            //two cases of this: 1. letter counter is greater because there is an extra letter, 2. letttercounter is greater because 1 was added
+            if (letterCounter > wordLength){
+                letterCounter -= 1;
+                currentLetter = currentWord[letterCounter];
+                backspaceCounter += 1
+                //backspaceCaret(currentWord, letterCounter)
+                backspaceCaret(currentWord, currentLetter);
+                currentLetter.remove();
+                console.log(letterCounter)
+            }
+            else if (letterCounter > 0 && letterCounter <= wordLength + 1){
+                letterCounter -= 1;
+                currentLetter = currentWord[letterCounter];
+                currentLetter.classList.remove('correct')
+                currentLetter.classList.remove('incorrect')
+                backspaceCaret(currentWord, currentLetter)
+            }
+            else if (letterCounter == 0) {
+                const wordsList = document.getElementById("words").children;
+                if (wordsList[wordCounter - 1].classList.contains('error')) {
+                    wordsList[wordCounter].classList.remove('active');
+                    wordsList[wordCounter - 1].classList.add('active');
+                    wordsList[wordCounter - 1].classList.remove('error');
+                    wordCounter -= 1;
+                    currentWord = document.getElementsByClassName("word active")[0].children;
+                    currentWordLength = currentWord.length;
+                    //starts a look starting from the last letter of the error word
+                    for (let i = currentWordLength - 1; i >= 0; i--){
+                        //gets the classes of the letter that it's looking at 
+                        classes = currentWord[i].classList;
+                        //if the letter contains 'incorrect'
+                        if (classes[0] == 'incorrect' || classes[0] == 'incorrect-extra'){
+                            let realWordLength = 0
+                            for (let x = 0; x <= currentWordLength - 1; x++){
+                                let a = currentWord[x].classList;
+                                if (a[0] != 'incorrect-extra'){
+                                    realWordLength += 1
+                                }
+                            }
+                            letterCounter = currentWordLength;
+                            wordLength = realWordLength;
+                            let positionReference = currentWord[letterCounter - 1];
+                            returnBackspaceCaret(currentWord, positionReference)
+                            return;
+                        }
+                        else if (classes[0] != 'correct'){
+                            for (let j = currentWordLength - 1; j >= 0; j--){
+                                classes = currentWord[j].classList;
+                                if (classes[0] == 'correct' || classes[0] == 'incorrect'){
+                                    letterCounter = j + 1;
+                                    currentLetter = currentWord[letterCounter];
+                                    let positionReference = currentWord[letterCounter - 1];
+                                    returnBackspaceCaret(currentWord, positionReference)
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    function checkLetter(letter, input){
+        if (letter == input) {
+            return 0;
+        }
+        else {
+            return 1; 
+        }
+    }
+    
+    function spaceBarCaret(){
+        const caret = document.getElementById("caret")
+        const activeWord = document.getElementsByClassName("active")[0]
+        var activeWordLocation = activeWord.getBoundingClientRect();
+        let activeWordLocationX = activeWordLocation.left;
+        let activeWordLocationY = activeWordLocation.top;
+        caret.style.left = activeWordLocationX + "px";
+        caret.style.top = activeWordLocationY + 'px';
+        caret.style.transition = 'left .2s'
+    }
+
+    function addErrorLetter(key){
+        var errorLetter = wrongLetter(key);
+        $(".active").append(errorLetter);
+        caret.style.left = newX + "px";
+        newX = newX + 18;
+        caret.style.transition = 'left .2s';
+    }
+
+    function addFillerSpace(){
+        var x = document.createElement('letter');
+        x.classList.add('filler')
+        $(".active").append(x);
+    }
+
+    function wrongLetter(key){
+        var x = document.createElement('letter');
+        x.classList.add('incorrect-extra')
+        x.innerHTML = key;
+        return x;
+    }
+
+    function letterCaret(x,y){
+        const caret = document.getElementById("caret")
+        const currentLetterLocation = y.getBoundingClientRect();
+        let currentLetterLocationX = currentLetterLocation.left;
+        let currentLetterLocationY = currentLetterLocation.top;
+        caret.style.left = currentLetterLocationX + 18.01 + "px";
+        caret.style.top = currentLetterLocationY + 'px';
+        caret.style.transition = 'left .2s'
+        //console.log(currentLetterLocationX, currentLetterLocationY)
+    }
+
+    function backspaceCaret(x,y){
+        const caret = document.getElementById("caret")
+        const currentLetterLocation = y.getBoundingClientRect();
+        let currentLetterLocationX = currentLetterLocation.left;
+        let currentLetterLocationY = currentLetterLocation.top;
+        caret.style.left = currentLetterLocationX + "px";
+        caret.style.top = currentLetterLocationY + 'px';
+        caret.style.transition = 'left .2s'
+    }
+
+    function wordChecker(currentWord, wordLength, wordsList){
+        for (let i = 0; i < currentWordLength; i++){
+            let classes = currentWord[i].classList
+            if (classes[0] == 'incorrect'  || classes[0] != 'correct'){
+                console.log('Word is incorrect')
+                lastWordCorrect = 'false';
+                wordsList[wordCounter - 1].classList.add("error")
+                wrong += 1
+                return;
+            }
+        }
+        console.log('word is correct')
+        lastWordCorrect = 'true';
+        right += 1;
+        return;
+    }
+
+    function returnBackspaceCaret(x,y){
+        const caret = document.getElementById("caret")
+        const currentLetterLocation = y.getBoundingClientRect();
+        let currentLetterLocationX = currentLetterLocation.left;
+        let currentLetterLocationY = currentLetterLocation.top;
+        caret.style.left = currentLetterLocationX + 18.01 + "px";
+        caret.style.top = currentLetterLocationY + 'px';
+        caret.style.transition = 'left .2s'
+        console.log(currentLetterLocationX, currentLetterLocationY)
+    }
+
+    function calculateRealLength(currentWord, currentWordLength){
+        let realWord = 0
+        for (let k = 0; k <= currentWordLength; k++){
+            let classes = currentWord[k].classList;
+            if (classes[0] == 'incorrect-extra'){
+                realWord = k;
+            }
+        }
+        return realWord;
+    }
+
+
+    </script>
+</head>
+<body class="dashboard" onload="initializeVariables()">
+    <div class="header">
+        <a href="/dashboard">Typer Challenge</a>
+        <div class="right-header">
+            <a href="">ACCOUNT</a>
+            <a href="">LEADERBOARD</a>
+            <a href="/friendslist">FRIENDS</a>
+
+            <form action="/logout" method="POST">
+                <button id="logout-button">LOGOUT</button>
+            </form>
+        </div>
+    </div>
+    <p id="countdown">60</p>
+    <div id="testArea">
+        <div id="wrapper">
+            <button id="startBtn" class="btn" onclick="startTest(), startTimer(), dailyTrial()">Begin Test</button>
+            <div id="caret" class="visible"></div>
+            <div id="words">
+                <% for (var i = 0; i < count; i++) { %>
+                    <div class="word">
+                        <% for(var j = 0; j < characters[i].length; j++) {%>
+                            <letter><%-characters[i][j]%></letter>
+                        <% } %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+        <div id="summary">
+            <p id="wpm"></p>
+        </div>
+    </div>
+</body>
+
+</html>
